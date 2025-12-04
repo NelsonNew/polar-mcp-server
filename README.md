@@ -4,31 +4,110 @@ Ein MCP (Model Context Protocol) Server für die Polar AccessLink API. Ermöglic
 
 ## Features
 
-- **get_exercises** - Trainingseinheiten der letzten 30 Tage abrufen, mit optionalen Samples (Herzfrequenz, Geschwindigkeit, Höhe, etc.) und Trainingszonen
-- **get_exercise** - Details zu einem spezifischen Training abrufen
-- **get_nightly_recharge** - Nightly Recharge Daten (ANS Charge, HRV, Atemfrequenz, Erholungsstatus)
-- **get_sleep** - Schlafanalyse (Schlafphasen, Schlaf-Score, Schlafdauer, Unterbrechungen)
-- **get_daily_activity** - Tägliche Aktivität (Schritte, Kalorien, aktive Zeit, Aktivitätsziel)
-- **get_user_info** - Benutzerinformationen (Name, Gewicht, Größe, etc.)
-- **get_physical_info** - Körperliche Daten (max. Herzfrequenz, Ruhe-HF, VO2max)
+- **get_exercises** - Trainingseinheiten der letzten 30 Tage mit optionalen Samples und Trainingszonen
+- **get_exercise** - Details zu einem spezifischen Training
+- **get_nightly_recharge** - Nightly Recharge Daten (ANS Charge, HRV, Atemfrequenz)
+- **get_sleep** - Schlafanalyse (Schlafphasen, Schlaf-Score, Schlafdauer)
+- **get_daily_activity** - Tägliche Aktivität (Schritte, Kalorien, Aktivitätsziel)
+- **get_user_info** - Benutzerinformationen
+- **get_physical_info** - Körperliche Daten (VO2max, max. HF, Ruhe-HF)
 
-## Voraussetzungen
+## Zwei Deployment-Optionen
 
-1. Ein [Polar Flow](https://flow.polar.com/) Konto
-2. Eine Polar Uhr (z.B. Pacer Pro, Vantage V2, Grit X, Ignite)
-3. API-Zugangsdaten von [Polar AccessLink](https://admin.polaraccesslink.com/)
+### Option 1: Remote (Cloudflare Workers) - Empfohlen für claude.ai
 
-## Setup
+Nutzer können einfach eine Website besuchen, sich mit Polar anmelden und den MCP Server in Claude.ai verwenden.
 
-### 1. API-Client erstellen
+### Option 2: Lokal (Claude Desktop)
+
+Für lokale Installation mit Claude Desktop.
+
+---
+
+## Option 1: Remote Deployment (Cloudflare Workers)
+
+### Voraussetzungen
+
+1. Ein [Cloudflare](https://cloudflare.com) Account
+2. API-Zugangsdaten von [Polar AccessLink](https://admin.polaraccesslink.com/)
+
+### Setup
+
+#### 1. Repository klonen
+
+```bash
+git clone https://github.com/NelsonNew/polar-mcp-server.git
+cd polar-mcp-server
+npm install
+```
+
+#### 2. Polar API-Client erstellen
 
 1. Gehe zu https://admin.polaraccesslink.com/
-2. Melde dich mit deinem Polar Flow Konto an
-3. Erstelle einen neuen API-Client
-4. Setze die Redirect URI auf: `http://localhost:8888/callback`
-5. Notiere dir die **Client ID** und das **Client Secret**
+2. Erstelle einen neuen API-Client
+3. **Wichtig:** Setze die Redirect URI auf: `https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev/callback`
+4. Notiere **Client ID** und **Client Secret**
 
-### 2. Installation
+#### 3. Cloudflare KV Namespace erstellen
+
+```bash
+npx wrangler kv namespace create OAUTH_KV
+```
+
+Kopiere die ausgegebene ID und füge sie in `wrangler.toml` ein:
+
+```toml
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "DEINE_KV_ID_HIER"
+```
+
+#### 4. Secrets setzen
+
+```bash
+npx wrangler secret put POLAR_CLIENT_ID
+# Gib deine Client ID ein
+
+npx wrangler secret put POLAR_CLIENT_SECRET
+# Gib dein Client Secret ein
+```
+
+#### 5. Deployen
+
+```bash
+npm run deploy
+```
+
+#### 6. Redirect URI aktualisieren
+
+Nach dem ersten Deploy erhältst du eine Worker-URL. Gehe zurück zu https://admin.polaraccesslink.com/ und aktualisiere die Redirect URI auf:
+
+```
+https://polar-mcp-server.YOUR-SUBDOMAIN.workers.dev/callback
+```
+
+### Verwendung (Remote)
+
+1. Öffne deine Worker-URL im Browser
+2. Klicke auf **"Connect with Polar"**
+3. Autorisiere die App bei Polar
+4. Kopiere die angezeigte MCP Server URL
+5. In Claude (claude.ai): **Settings → Integrations → Add MCP Server**
+6. Füge die URL ein
+
+---
+
+## Option 2: Lokale Installation (Claude Desktop)
+
+### Voraussetzungen
+
+1. Ein [Polar Flow](https://flow.polar.com/) Konto
+2. Eine Polar Uhr (z.B. Pacer Pro, Vantage V2, Grit X)
+3. API-Zugangsdaten von [Polar AccessLink](https://admin.polaraccesslink.com/)
+
+### Setup
+
+#### 1. Installation
 
 ```bash
 git clone https://github.com/NelsonNew/polar-mcp-server.git
@@ -37,22 +116,24 @@ npm install
 npm run build
 ```
 
-### 3. Access Token generieren
+#### 2. API-Client erstellen
+
+1. Gehe zu https://admin.polaraccesslink.com/
+2. Erstelle einen neuen API-Client
+3. Setze die Redirect URI auf: `http://localhost:8888/callback`
+4. Notiere **Client ID** und **Client Secret**
+
+#### 3. Access Token generieren
 
 ```bash
 export POLAR_CLIENT_ID="deine_client_id"
 export POLAR_CLIENT_SECRET="dein_client_secret"
-npx tsx src/auth.ts
+npm run auth
 ```
 
-Folge den Anweisungen:
-1. Öffne die angezeigte URL im Browser
-2. Autorisiere die Anwendung bei Polar
-3. Kopiere den Access Token aus dem Terminal
+Folge den Anweisungen und kopiere den Access Token.
 
-### 4. Claude Desktop konfigurieren
-
-Füge folgendes zu deiner Claude Desktop Konfiguration hinzu:
+#### 4. Claude Desktop konfigurieren
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -71,23 +152,32 @@ Füge folgendes zu deiner Claude Desktop Konfiguration hinzu:
 }
 ```
 
-### 5. Claude neu starten
+#### 5. Claude Desktop neu starten
 
-Starte Claude Desktop neu, um den MCP Server zu laden.
+---
 
-## Verwendung
+## Beispiel-Anfragen
 
-Sobald der Server läuft, kannst du Claude nach deinen Polar Daten fragen:
+Sobald verbunden, kannst du Claude fragen:
 
 - "Zeig mir meine letzten Trainings"
 - "Wie war mein Schlaf letzte Nacht?"
 - "Analysiere meinen Nightly Recharge der letzten Woche"
 - "Wie viele Schritte bin ich heute gegangen?"
 - "Zeig mir meine Herzfrequenz-Samples vom letzten Lauf"
+- "Wie ist meine aktuelle Erholung (ANS Charge)?"
+
+## Unterstützte Geräte
+
+- Polar Pacer / Pacer Pro
+- Polar Vantage V2 / V3
+- Polar Vantage M / M2
+- Polar Grit X / Grit X Pro
+- Polar Ignite / Ignite 2 / Ignite 3
+- Polar Unite
+- und weitere...
 
 ## API Endpoints
-
-Der Server nutzt folgende Polar AccessLink API v3 Endpoints:
 
 | Tool | Endpoint | Beschreibung |
 |------|----------|--------------|
@@ -99,51 +189,17 @@ Der Server nutzt folgende Polar AccessLink API v3 Endpoints:
 | get_daily_activity | `/v3/users/activity` | Tägliche Aktivität |
 | get_physical_info | `/v3/users/physical-information` | Körperliche Daten |
 
-## Datenbeispiele
-
-### Nightly Recharge
-```json
-{
-  "polar_user": "...",
-  "date": "2024-01-15",
-  "heart_rate_avg": 52,
-  "heart_rate_variability_avg": 45,
-  "breathing_rate_avg": 14.5,
-  "nightly_recharge_status": 3,
-  "ans_charge": 2.5,
-  "ans_charge_status": 3
-}
-```
-
-### Sleep
-```json
-{
-  "polar_user": "...",
-  "date": "2024-01-15",
-  "sleep_start_time": "2024-01-14T23:15:00",
-  "sleep_end_time": "2024-01-15T07:30:00",
-  "device_id": "...",
-  "continuity": 3.5,
-  "continuity_class": 3,
-  "light_sleep": 14400,
-  "deep_sleep": 7200,
-  "rem_sleep": 5400,
-  "total_interruption_duration": 1800,
-  "sleep_score": 82
-}
-```
-
 ## Fehlerbehebung
 
-### "POLAR_ACCESS_TOKEN environment variable is required"
-Stelle sicher, dass der Access Token in der Claude Desktop Konfiguration gesetzt ist.
+### "Session expired"
+Besuche `/authorize` erneut, um eine neue Session zu erstellen.
 
 ### "Polar API error (403)"
-- Der Access Token könnte abgelaufen sein → Generiere einen neuen
-- Der Benutzer ist möglicherweise nicht registriert → Führe das Auth-Script erneut aus
+- Der Access Token könnte abgelaufen sein
+- Der Benutzer ist möglicherweise nicht registriert
 
 ### "Polar API error (401)"
-Ungültiger Access Token → Generiere einen neuen Token mit dem Auth-Script
+Ungültiger Access Token - generiere einen neuen.
 
 ## Lizenz
 
@@ -151,6 +207,7 @@ MIT
 
 ## Links
 
-- [Polar AccessLink API Dokumentation](https://www.polar.com/accesslink-api/)
+- [Polar AccessLink API](https://www.polar.com/accesslink-api/)
 - [Polar Developer Portal](https://admin.polaraccesslink.com/)
 - [MCP Protokoll](https://modelcontextprotocol.io/)
+- [Cloudflare Workers](https://workers.cloudflare.com/)

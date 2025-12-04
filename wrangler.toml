@@ -1,0 +1,24 @@
+name = "polar-mcp-server"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespace for OAuth sessions
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "YOUR_KV_NAMESPACE_ID"  # Replace after creating: wrangler kv namespace create OAUTH_KV
+
+# Environment variables (set via wrangler secret)
+# wrangler secret put POLAR_CLIENT_ID
+# wrangler secret put POLAR_CLIENT_SECRET
+
+[vars]
+# Non-sensitive variables can go here
+
+# Development settings
+[env.dev]
+name = "polar-mcp-server-dev"
+
+[[env.dev.kv_namespaces]]
+binding = "OAUTH_KV"
+id = "YOUR_DEV_KV_NAMESPACE_ID"  # Replace after creating: wrangler kv namespace create OAUTH_KV --env dev
