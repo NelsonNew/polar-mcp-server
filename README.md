@@ -123,7 +123,7 @@ npm run build
 3. Setze die Redirect URI auf: `http://localhost:8888/callback`
 4. Notiere **Client ID** und **Client Secret**
 
-#### 3. Access Token generieren
+#### 3. Access Token und User ID generieren
 
 ```bash
 export POLAR_CLIENT_ID="deine_client_id"
@@ -131,7 +131,11 @@ export POLAR_CLIENT_SECRET="dein_client_secret"
 npm run auth
 ```
 
-Folge den Anweisungen und kopiere den Access Token.
+Folge den Anweisungen im Browser, um dich mit Polar anzumelden. Das Skript zeigt dir dann:
+- **Access Token** - Dein persönlicher API-Schlüssel
+- **User ID** - Deine Polar-Benutzer-ID (wird für manche API-Endpunkte benötigt)
+
+Kopiere beide Werte - du brauchst sie gleich! 🎯
 
 #### 4. Claude Desktop konfigurieren
 
@@ -145,12 +149,16 @@ Folge den Anweisungen und kopiere den Access Token.
       "command": "node",
       "args": ["/pfad/zu/polar-mcp-server/dist/index.js"],
       "env": {
-        "POLAR_ACCESS_TOKEN": "dein_access_token"
+        "POLAR_ACCESS_TOKEN": "dein_access_token",
+        "POLAR_USER_ID": "deine_user_id"
       }
     }
   }
 }
 ```
+
+**Wichtig! ⚠️** Beide Werte (`POLAR_ACCESS_TOKEN` und `POLAR_USER_ID`) sind erforderlich!
+Das Auth-Skript (`npm run auth`) zeigt dir beide nach erfolgreicher Anmeldung an.
 
 #### 5. Claude Desktop neu starten
 
@@ -181,25 +189,49 @@ Sobald verbunden, kannst du Claude fragen:
 
 | Tool | Endpoint | Beschreibung |
 |------|----------|--------------|
-| get_user_info | `/v3/users/me` | Benutzerinformationen |
+| get_user_info | `/v3/users/{user-id}` | Benutzerinformationen |
 | get_exercises | `/v3/exercises` | Trainingsübersicht |
 | get_exercise | `/v3/exercises/{id}` | Training-Details |
 | get_nightly_recharge | `/v3/users/nightly-recharge` | Nightly Recharge |
 | get_sleep | `/v3/users/sleep` | Schlafdaten |
-| get_daily_activity | `/v3/users/activity` | Tägliche Aktivität |
-| get_physical_info | `/v3/users/physical-information` | Körperliche Daten |
+| get_daily_activity | `/v3/users/activities` | Tägliche Aktivität |
+| get_physical_info | `/v3/users/{user-id}/physical-information-transactions` | Körperliche Daten (Transaktionsmodell) |
 
 ## Fehlerbehebung
 
-### "Session expired"
+### "POLAR_USER_ID environment variable is required"
+Oje! Die User ID fehlt in deiner Konfiguration.
+
+**Lösung:**
+1. Führe `npm run auth` erneut aus
+2. Kopiere sowohl den **Access Token** als auch die **User ID**
+3. Füge beide in deine Claude Desktop Config ein:
+```json
+"env": {
+  "POLAR_ACCESS_TOKEN": "dein_token",
+  "POLAR_USER_ID": "deine_user_id"
+}
+```
+
+### "Polar API error (404)" - Keine Daten gefunden
+Kann mehrere Ursachen haben:
+- **Bei Activities:** Du hast noch keine Aktivitätsdaten. Trag deine Polar-Uhr ein paar Stunden! 🏃‍♂️
+- **Bei Exercises:** Deine Polar-Uhr hat noch keine strukturierten Trainingseinheiten aufgezeichnet
+- **Bei Physical Info:** Es gibt keine neuen Messungen seit dem letzten Abruf
+
+### "Session expired" (Remote Deployment)
 Besuche `/authorize` erneut, um eine neue Session zu erstellen.
 
 ### "Polar API error (403)"
-- Der Access Token könnte abgelaufen sein
-- Der Benutzer ist möglicherweise nicht registriert
+- Der Access Token könnte abgelaufen sein (sehr unwahrscheinlich - Tokens laufen normalerweise nicht ab)
+- Der Benutzer ist möglicherweise nicht registriert - führe `npm run auth` erneut aus
+- Du hast die Zustimmung in deinem Polar Flow Account widerrufen
 
 ### "Polar API error (401)"
-Ungültiger Access Token - generiere einen neuen.
+Ungültiger Access Token - generiere einen neuen mit `npm run auth`.
+
+### Tools funktionieren nicht nach dem Update?
+Vergiss nicht, Claude Desktop **neu zu starten**! Der MCP-Server lädt nur beim Start. 🔄
 
 ## Lizenz
 
