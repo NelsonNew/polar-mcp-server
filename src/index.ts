@@ -18,6 +18,17 @@ const getAccessToken = (): string => {
   return token;
 };
 
+const getUserId = (): string => {
+  const userId = process.env.POLAR_USER_ID;
+  if (!userId) {
+    throw new Error(
+      "POLAR_USER_ID environment variable is required. " +
+        "Please set it with your Polar user ID (x_user_id from auth flow)."
+    );
+  }
+  return userId;
+};
+
 // Helper function to make authenticated API calls
 async function polarApiRequest(
   endpoint: string,
@@ -63,7 +74,8 @@ server.tool(
   {},
   async () => {
     try {
-      const userInfo = await polarApiRequest("/users/me");
+      const userId = getUserId();
+      const userInfo = await polarApiRequest(`/users/${userId}`);
       return {
         content: [
           {
@@ -281,9 +293,9 @@ server.tool(
   },
   async ({ date }) => {
     try {
-      let endpoint = "/users/activity";
+      let endpoint = "/users/activities";
       if (date) {
-        endpoint = `/users/activity/${date}`;
+        endpoint = `/users/activities/${date}`;
       }
 
       const activityData = await polarApiRequest(endpoint);
@@ -312,16 +324,63 @@ server.tool(
 // Tool: Get Physical Info
 server.tool(
   "get_physical_info",
-  "Get physical information and body metrics including weight, height, maximum heart rate, resting heart rate, VO2max, and other physical characteristics.",
+  "Get physical information and body metrics including weight, height, maximum heart rate, resting heart rate, VO2max, and other physical characteristics. Uses transaction-based retrieval.",
   {},
   async () => {
     try {
-      const physicalInfo = await polarApiRequest("/users/physical-information");
+      const userId = getUserId();
+
+      // Step 1: Create transaction
+      const transaction = await polarApiRequest(
+        `/users/${userId}/physical-information-transactions`,
+        { method: "POST" }
+      ) as { "transaction-id": number; "resource-uri": string };
+
+      const transactionId = transaction["transaction-id"];
+
+      // Step 2: List physical info items in transaction
+      const transactionData = await polarApiRequest(
+        `/users/${userId}/physical-information-transactions/${transactionId}`
+      ) as { "physical-informations": string[] };
+
+      const physicalInfoUrls = transactionData["physical-informations"];
+
+      if (!physicalInfoUrls || physicalInfoUrls.length === 0) {
+        // Step 3b: Commit empty transaction
+        await polarApiRequest(
+          `/users/${userId}/physical-information-transactions/${transactionId}`,
+          { method: "PUT" }
+        );
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "No new physical information data available.",
+            },
+          ],
+        };
+      }
+
+      // Step 3: Fetch all physical info items
+      const physicalInfoItems = [];
+      for (const url of physicalInfoUrls) {
+        const urlPath = url.replace("https://www.polaraccesslink.com", "");
+        const item = await polarApiRequest(urlPath);
+        physicalInfoItems.push(item);
+      }
+
+      // Step 4: Commit transaction
+      await polarApiRequest(
+        `/users/${userId}/physical-information-transactions/${transactionId}`,
+        { method: "PUT" }
+      );
+
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(physicalInfo, null, 2),
+            text: JSON.stringify(physicalInfoItems, null, 2),
           },
         ],
       };
