@@ -176,14 +176,20 @@ async function main() {
     console.log("");
     console.log(`  ${tokenData.access_token}`);
     console.log("");
+    console.log("Your user ID:");
+    console.log("");
+    console.log(`  ${tokenData.x_user_id}`);
+    console.log("");
     console.log("Add this to your Claude Desktop config or environment:");
     console.log("");
     console.log(`  export POLAR_ACCESS_TOKEN="${tokenData.access_token}"`);
+    console.log(`  export POLAR_USER_ID="${tokenData.x_user_id}"`);
     console.log("");
     console.log("Or add to your Claude Desktop config.json:");
     console.log("");
     console.log(`  "env": {`);
-    console.log(`    "POLAR_ACCESS_TOKEN": "${tokenData.access_token}"`);
+    console.log(`    "POLAR_ACCESS_TOKEN": "${tokenData.access_token}",`);
+    console.log(`    "POLAR_USER_ID": "${tokenData.x_user_id}"`);
     console.log(`  }`);
     console.log("");
   } catch (error) {
