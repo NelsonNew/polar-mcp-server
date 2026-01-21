@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Polar MCP Server Evaluation
+
+  IMPORTANT: This evaluation requires actual Polar user data to verify answers.
+  The placeholder answers below must be replaced with values from a test account
+  with sufficient historical data (at least 30 days of exercises, sleep, and activity).
+
+  To run this evaluation:
+  1. Set up a Polar account with historical data
+  2. Obtain an access token using: npm run auth
+  3. Replace placeholder answers with actual values from the test account
+  4. Run: python scripts/evaluation.py -t stdio -c node -a dist/index.js -e POLAR_ACCESS_TOKEN=your_token evaluation.xml
+
+  Questions are designed to test:
+  - Multiple tool calls and data synthesis
+  - Date range queries
+  - Cross-referencing between exercises, sleep, and recovery data
+  - Understanding of fitness metrics (HRV, cardio load, zones)
+-->
+<evaluation>
+  <qa_pair>
+    <question>Find the exercise from December 2024 with the highest average heart rate. What was the sport type of that exercise? Answer with just the sport name (e.g., "RUNNING", "CYCLING").</question>
+    <answer>PLACEHOLDER_SPORT_TYPE</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Compare sleep data from the first week of January 2025 (Jan 1-7) to the second week (Jan 8-14). Which week had better average sleep scores? Answer "first week" or "second week".</question>
+    <answer>PLACEHOLDER_WEEK</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look at the nightly recharge data from December 2024. Find the night with the highest ANS charge value. What was the date of that night? Answer in YYYY-MM-DD format.</question>
+    <answer>PLACEHOLDER_DATE</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Analyze all exercises from November 2024. Calculate the total duration across all exercises. What was the total duration in minutes? Round to the nearest whole number.</question>
+    <answer>PLACEHOLDER_MINUTES</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Find the day in December 2024 with the highest step count from daily activity data. On that same day, what was the sleep score from the previous night? Answer with just the numeric sleep score.</question>
+    <answer>PLACEHOLDER_SCORE</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look at cardio load history over the past 30 days. Identify if the training load status is "MAINTAINING", "PRODUCTIVE", "DETRAINING", or "OVERREACHING". What is the current load status?</question>
+    <answer>PLACEHOLDER_STATUS</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Find all exercises from January 2025 that have heart rate zone data. Among these, which exercise spent the most total time in Zone 4 and Zone 5 combined? What was the start date and time of that exercise? Answer in YYYY-MM-DD HH:MM format.</question>
+    <answer>PLACEHOLDER_DATETIME</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Compare the user's resting heart rate from physical info with their average sleeping heart rate from sleep data over the last week. Is the sleeping heart rate lower than, equal to, or higher than the resting heart rate? Answer "lower", "equal", or "higher".</question>
+    <answer>PLACEHOLDER_COMPARISON</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Using SleepWise alertness data from the past week, identify which day had the predicted lowest alertness level. What day of the week was it? Answer with the day name (e.g., "Monday", "Tuesday").</question>
+    <answer>PLACEHOLDER_DAY</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look at exercises with GPS data from the last 30 days that have route information available (can be exported as GPX). How many such exercises exist? Answer with the count as a number.</question>
+    <answer>PLACEHOLDER_COUNT</answer>
+  </qa_pair>
+</evaluation>

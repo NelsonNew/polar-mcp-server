@@ -198,6 +198,457 @@ function createPolarServer(accessToken: string): McpServer {
     }
   );
 
+  // Tool: Get Continuous Heart Rate
+  server.tool(
+    "get_continuous_heart_rate",
+    "Get continuous heart rate data (5-min intervals) for a specific date.",
+    {
+      date: z.string().describe("Date (YYYY-MM-DD format). Required."),
+    },
+    async ({ date }) => {
+      try {
+        const result = await polarApiRequest(`/users/continuous-heart-rate/${date}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Continuous Heart Rate Range
+  server.tool(
+    "get_continuous_heart_rate_range",
+    "Get continuous heart rate data for a date range.",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/continuous-heart-rate?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Cardio Load
+  server.tool(
+    "get_cardio_load",
+    "Get cardio load (TRIMP) data: acute load, chronic load, load status.",
+    {
+      date: z.string().optional().describe("Date (YYYY-MM-DD). Optional."),
+    },
+    async ({ date }) => {
+      try {
+        const endpoint = date ? `/users/cardio-load/${date}` : "/users/cardio-load";
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Cardio Load Range
+  server.tool(
+    "get_cardio_load_range",
+    "Get cardio load data for a date range.",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/cardio-load/date?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Cardio Load History
+  server.tool(
+    "get_cardio_load_history",
+    "Get historical cardio load aggregated by days or months.",
+    {
+      period_type: z.enum(["days", "months"]).describe("'days' or 'months'. Required."),
+      count: z.number().describe("Number of periods. Required."),
+    },
+    async ({ period_type, count }) => {
+      try {
+        const result = await polarApiRequest(`/users/cardio-load/period/${period_type}/${count}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Activity Samples
+  server.tool(
+    "get_activity_samples",
+    "Get detailed activity samples: step counts and activity zones throughout the day.",
+    {
+      date: z.string().optional().describe("Date (YYYY-MM-DD). Optional."),
+    },
+    async ({ date }) => {
+      try {
+        const endpoint = date ? `/users/activities/samples/${date}` : "/users/activities/samples";
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Activity Samples Range
+  server.tool(
+    "get_activity_samples_range",
+    "Get activity samples for a date range (max 28 days).",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/activities/samples?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get SleepWise Alertness
+  server.tool(
+    "get_sleepwise_alertness",
+    "Get SleepWise alertness predictions based on sleep patterns.",
+    {
+      from: z.string().optional().describe("Start date (YYYY-MM-DD). Optional."),
+      to: z.string().optional().describe("End date (YYYY-MM-DD). Optional."),
+    },
+    async ({ from, to }) => {
+      try {
+        let endpoint = "/users/sleepwise/alertness";
+        if (from || to) {
+          const params = new URLSearchParams();
+          if (from) params.append("from", from);
+          if (to) params.append("to", to);
+          endpoint = `/users/sleepwise/alertness/date?${params.toString()}`;
+        }
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get SleepWise Circadian Bedtime
+  server.tool(
+    "get_sleepwise_circadian_bedtime",
+    "Get optimal bedtime recommendations based on circadian rhythm.",
+    {
+      from: z.string().optional().describe("Start date (YYYY-MM-DD). Optional."),
+      to: z.string().optional().describe("End date (YYYY-MM-DD). Optional."),
+    },
+    async ({ from, to }) => {
+      try {
+        let endpoint = "/users/sleepwise/circadian-bedtime";
+        if (from || to) {
+          const params = new URLSearchParams();
+          if (from) params.append("from", from);
+          if (to) params.append("to", to);
+          endpoint = `/users/sleepwise/circadian-bedtime/date?${params.toString()}`;
+        }
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Body Temperature
+  server.tool(
+    "get_body_temperature",
+    "Get body temperature data from Elixir biosensing.",
+    {
+      from: z.string().optional().describe("Start date (YYYY-MM-DD). Optional."),
+      to: z.string().optional().describe("End date (YYYY-MM-DD). Optional."),
+    },
+    async ({ from, to }) => {
+      try {
+        let endpoint = "/users/biosensing/bodytemperature";
+        if (from || to) {
+          const params = new URLSearchParams();
+          if (from) params.append("from", from);
+          if (to) params.append("to", to);
+          endpoint = `${endpoint}?${params.toString()}`;
+        }
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Skin Temperature
+  server.tool(
+    "get_skin_temperature",
+    "Get sleep skin temperature data from Elixir biosensing.",
+    {
+      from: z.string().optional().describe("Start date (YYYY-MM-DD). Optional."),
+      to: z.string().optional().describe("End date (YYYY-MM-DD). Optional."),
+    },
+    async ({ from, to }) => {
+      try {
+        let endpoint = "/users/biosensing/skintemperature";
+        if (from || to) {
+          const params = new URLSearchParams();
+          if (from) params.append("from", from);
+          if (to) params.append("to", to);
+          endpoint = `${endpoint}?${params.toString()}`;
+        }
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get SpO2
+  server.tool(
+    "get_spo2",
+    "Get SpO2 (blood oxygen) test results from Elixir biosensing.",
+    {
+      from: z.string().optional().describe("Start date (YYYY-MM-DD). Optional."),
+      to: z.string().optional().describe("End date (YYYY-MM-DD). Optional."),
+    },
+    async ({ from, to }) => {
+      try {
+        let endpoint = "/users/biosensing/spo2";
+        if (from || to) {
+          const params = new URLSearchParams();
+          if (from) params.append("from", from);
+          if (to) params.append("to", to);
+          endpoint = `${endpoint}?${params.toString()}`;
+        }
+        const result = await polarApiRequest(endpoint, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Exercise FIT
+  server.tool(
+    "get_exercise_fit",
+    "Download exercise in FIT format.",
+    {
+      exerciseId: z.string().describe("Exercise ID. Required."),
+    },
+    async ({ exerciseId }) => {
+      try {
+        const result = await polarApiRequest(`/exercises/${exerciseId}/fit`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Exercise TCX
+  server.tool(
+    "get_exercise_tcx",
+    "Download exercise in TCX format.",
+    {
+      exerciseId: z.string().describe("Exercise ID. Required."),
+    },
+    async ({ exerciseId }) => {
+      try {
+        const result = await polarApiRequest(`/exercises/${exerciseId}/tcx`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Exercise GPX
+  server.tool(
+    "get_exercise_gpx",
+    "Download exercise GPS route in GPX format.",
+    {
+      exerciseId: z.string().describe("Exercise ID. Required."),
+    },
+    async ({ exerciseId }) => {
+      try {
+        const result = await polarApiRequest(`/exercises/${exerciseId}/gpx`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Daily Activity Range
+  server.tool(
+    "get_daily_activity_range",
+    "Get daily activity data for a date range.",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/activities?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Sleep Range
+  server.tool(
+    "get_sleep_range",
+    "Get sleep data for a date range.",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/sleep?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Tool: Get Nightly Recharge Range
+  server.tool(
+    "get_nightly_recharge_range",
+    "Get Nightly Recharge data for a date range.",
+    {
+      from: z.string().describe("Start date (YYYY-MM-DD). Required."),
+      to: z.string().describe("End date (YYYY-MM-DD). Required."),
+    },
+    async ({ from, to }) => {
+      try {
+        const params = new URLSearchParams({ from, to });
+        const result = await polarApiRequest(`/users/nightly-recharge?${params.toString()}`, accessToken);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
   return server;
 }
 
