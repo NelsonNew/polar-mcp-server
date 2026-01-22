@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 # KV Namespace for OAuth sessions
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "YOUR_KV_NAMESPACE_ID"  # Replace after creating: wrangler kv namespace create OAUTH_KV
+id = "1986c08548ae49278a3c6d93c36c38ec"
 
 # Environment variables (set via wrangler secret)
 # wrangler secret put POLAR_CLIENT_ID
