@@ -281,9 +281,9 @@ server.tool(
   },
   async ({ date }) => {
     try {
-      let endpoint = "/users/activity";
+      let endpoint = "/users/activities";
       if (date) {
-        endpoint = `/users/activity/${date}`;
+        endpoint = `/users/activities/${date}`;
       }
 
       const activityData = await polarApiRequest(endpoint);

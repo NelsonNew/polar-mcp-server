@@ -22,8 +22,8 @@ export interface Env {
   OAUTH_KV: KVNamespace;
 }
 
-// Create a function to build the MCP server with the access token
-function createPolarServer(accessToken: string): McpServer {
+// Create a function to build the MCP server with the access token and user ID
+function createPolarServer(accessToken: string, userId: number): McpServer {
   const server = new McpServer({
     name: "Polar AccessLink",
     version: "1.0.0",
@@ -36,7 +36,7 @@ function createPolarServer(accessToken: string): McpServer {
     {},
     async () => {
       try {
-        const result = await polarApiRequest("/users/me", accessToken);
+        const result = await polarApiRequest(`/users/${userId}`, accessToken);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -163,8 +163,8 @@ function createPolarServer(accessToken: string): McpServer {
     },
     async ({ date }) => {
       try {
-        let endpoint = "/users/activity";
-        if (date) endpoint = `/users/activity/${date}`;
+        let endpoint = "/users/activities";
+        if (date) endpoint = `/users/activities/${date}`;
         const result = await polarApiRequest(endpoint, accessToken);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
@@ -888,10 +888,10 @@ export default {
         );
       }
 
-      const { accessToken } = JSON.parse(sessionData);
+      const { accessToken, userId } = JSON.parse(sessionData);
 
-      // Create MCP server with the user's access token
-      const server = createPolarServer(accessToken);
+      // Create MCP server with the user's access token and ID
+      const server = createPolarServer(accessToken, userId);
 
       // Use Cloudflare's MCP handler
       const handler = createMcpHandler(server);

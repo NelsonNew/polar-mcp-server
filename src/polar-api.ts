@@ -598,9 +598,9 @@ export async function executePolarTool(
       }
 
       case "get_daily_activity": {
-        let endpoint = "/users/activity";
+        let endpoint = "/users/activities";
         if (args.date) {
-          endpoint = `/users/activity/${args.date}`;
+          endpoint = `/users/activities/${args.date}`;
         }
         result = await polarApiRequest(endpoint, accessToken);
         break;
