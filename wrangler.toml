@@ -3,10 +3,18 @@ main = "src/worker.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
-# KV Namespace for OAuth sessions
+# KV Namespace for OAuth state and tokens
 [[kv_namespaces]]
 binding = "OAUTH_KV"
 id = "1986c08548ae49278a3c6d93c36c38ec"
+
+# Durable Objects for MCP sessions
+[durable_objects]
+bindings = [{ name = "MCP_OBJECT", class_name = "MyMCP" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MyMCP"]
 
 # Environment variables (set via wrangler secret)
 # wrangler secret put POLAR_CLIENT_ID
@@ -22,3 +30,10 @@ name = "polar-mcp-server-dev"
 [[env.dev.kv_namespaces]]
 binding = "OAUTH_KV"
 id = "YOUR_DEV_KV_NAMESPACE_ID"  # Replace after creating: wrangler kv namespace create OAUTH_KV --env dev
+
+[env.dev.durable_objects]
+bindings = [{ name = "MCP_OBJECT", class_name = "MyMCP" }]
+
+[[env.dev.migrations]]
+tag = "v1"
+new_sqlite_classes = ["MyMCP"]

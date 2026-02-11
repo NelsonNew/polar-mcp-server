@@ -1,20 +1,15 @@
 # Polar MCP Server
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare)](https://workers.cloudflare.com/)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io/)
-
 An MCP (Model Context Protocol) server for the Polar AccessLink API. Connect your Polar fitness data to Claude AI - access workouts, sleep analysis, recovery metrics, heart rate data, and more.
 
 ## Quick Start (Public Instance)
 
 **No setup required!** Use our hosted instance:
 
-1. Visit **[polar-mcp-server.n-neuhaeusel.workers.dev](https://polar-mcp-server.n-neuhaeusel.workers.dev)**
-2. Click **"Connect with Polar"** and authorize with your Polar account
-3. Copy the MCP Server URL you receive
-4. In Claude: **Settings → Integrations → Add MCP Server**
-5. Paste the URL and start chatting about your fitness data!
+1. In Claude: **Settings → Integrations → Add MCP Server**
+2. Enter the URL: `https://polar-mcp-server.n-neuhaeusel.workers.dev/mcp`
+3. Claude will open an authorization window — log in with your Polar account
+4. Start chatting about your fitness data!
 
 ## Features
 
@@ -145,7 +140,6 @@ All tools use the [Polar AccessLink API v3](https://www.polar.com/accesslink-api
 
 | Error | Solution |
 |-------|----------|
-| "Session expired" | Visit `/authorize` again to create a new session |
 | "Polar API error (403)" | Re-authorize or check if data sync is complete |
 | "Polar API error (404)" | Endpoint not available for your device/subscription |
 | No exercise data | Sync your Polar device to Polar Flow app first |
@@ -153,8 +147,8 @@ All tools use the [Polar AccessLink API v3](https://www.polar.com/accesslink-api
 ## Privacy
 
 - Your Polar credentials are never stored
-- OAuth tokens are stored in Cloudflare KV with 24-hour expiration
-- Each user gets their own isolated session
+- OAuth tokens are managed securely by the Cloudflare Workers OAuth provider
+- Each user gets their own isolated MCP session
 - No fitness data is logged or stored on our servers
 
 ## Contributing
