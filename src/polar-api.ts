@@ -549,14 +549,16 @@ export const POLAR_TOOLS = {
 export async function executePolarTool(
   toolName: string,
   args: Record<string, unknown>,
-  accessToken: string
+  accessToken: string,
+  userId?: string | number
 ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   try {
     let result: unknown;
 
     switch (toolName) {
       case "get_user_info":
-        result = await polarApiRequest("/users/me", accessToken);
+        if (!userId) throw new Error("User ID is required for get_user_info. Set POLAR_USER_ID environment variable.");
+        result = await polarApiRequest(`/users/${userId}`, accessToken);
         break;
 
       case "get_exercises": {
@@ -606,9 +608,59 @@ export async function executePolarTool(
         break;
       }
 
-      case "get_physical_info":
-        result = await polarApiRequest("/users/physical-information", accessToken);
+      case "get_physical_info": {
+        if (!userId) throw new Error("User ID is required for get_physical_info. Set POLAR_USER_ID environment variable.");
+        // Physical info requires the transaction model:
+        // 1. Create transaction
+        const txResponse = await polarApiRequest(
+          `/users/${userId}/physical-information-transactions`,
+          accessToken,
+          { method: "POST" }
+        ) as { "transaction-id": number; "resource-uri": string } | null;
+
+        if (!txResponse) {
+          result = { message: "No new physical information available." };
+          break;
+        }
+
+        const txId = txResponse["transaction-id"];
+
+        // 2. List resources in transaction
+        const resourceList = await polarApiRequest(
+          `/users/${userId}/physical-information-transactions/${txId}`,
+          accessToken
+        ) as { "physical-informations": string[] } | null;
+
+        if (!resourceList || !resourceList["physical-informations"]?.length) {
+          // Commit empty transaction
+          await polarApiRequest(
+            `/users/${userId}/physical-information-transactions/${txId}`,
+            accessToken,
+            { method: "PUT" }
+          ).catch(() => {});
+          result = { message: "No physical information resources found." };
+          break;
+        }
+
+        // 3. Fetch each resource
+        const physicalInfos: unknown[] = [];
+        for (const resourceUrl of resourceList["physical-informations"]) {
+          // Resource URLs are absolute, extract the path
+          const resourcePath = new URL(resourceUrl).pathname.replace("/v3", "");
+          const info = await polarApiRequest(resourcePath, accessToken);
+          physicalInfos.push(info);
+        }
+
+        // 4. Commit transaction
+        await polarApiRequest(
+          `/users/${userId}/physical-information-transactions/${txId}`,
+          accessToken,
+          { method: "PUT" }
+        ).catch(() => {});
+
+        result = physicalInfos.length === 1 ? physicalInfos[0] : physicalInfos;
         break;
+      }
 
       case "get_continuous_heart_rate": {
         const endpoint = `/users/continuous-heart-rate/${args.date}`;
