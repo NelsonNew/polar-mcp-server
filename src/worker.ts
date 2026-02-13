@@ -25,6 +25,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 
   async init() {
     const accessToken = this.props.accessToken;
+    const userId = this.props.userId;
 
     // Tool: Get User Info
     this.server.tool(
@@ -33,7 +34,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       {},
       async () => {
         try {
-          const result = await polarApiRequest("/users/me", accessToken);
+          const result = await polarApiRequest(`/users/${userId}`, accessToken);
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
           };
@@ -175,14 +176,61 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       }
     );
 
-    // Tool: Get Physical Info
+    // Tool: Get Physical Info (requires transaction model)
     this.server.tool(
       "get_physical_info",
       "Get physical info: weight, height, max heart rate, resting HR, VO2max.",
       {},
       async () => {
         try {
-          const result = await polarApiRequest("/users/physical-information", accessToken);
+          // 1. Create transaction
+          const txResponse = await polarApiRequest(
+            `/users/${userId}/physical-information-transactions`,
+            accessToken,
+            { method: "POST" }
+          ) as { "transaction-id": number; "resource-uri": string } | null;
+
+          if (!txResponse) {
+            return {
+              content: [{ type: "text" as const, text: JSON.stringify({ message: "No new physical information available." }, null, 2) }],
+            };
+          }
+
+          const txId = txResponse["transaction-id"];
+
+          // 2. List resources in transaction
+          const resourceList = await polarApiRequest(
+            `/users/${userId}/physical-information-transactions/${txId}`,
+            accessToken
+          ) as { "physical-informations": string[] } | null;
+
+          if (!resourceList || !resourceList["physical-informations"]?.length) {
+            await polarApiRequest(
+              `/users/${userId}/physical-information-transactions/${txId}`,
+              accessToken,
+              { method: "PUT" }
+            ).catch(() => {});
+            return {
+              content: [{ type: "text" as const, text: JSON.stringify({ message: "No physical information resources found." }, null, 2) }],
+            };
+          }
+
+          // 3. Fetch each resource
+          const physicalInfos: unknown[] = [];
+          for (const resourceUrl of resourceList["physical-informations"]) {
+            const resourcePath = new URL(resourceUrl).pathname.replace("/v3", "");
+            const info = await polarApiRequest(resourcePath, accessToken);
+            physicalInfos.push(info);
+          }
+
+          // 4. Commit transaction
+          await polarApiRequest(
+            `/users/${userId}/physical-information-transactions/${txId}`,
+            accessToken,
+            { method: "PUT" }
+          ).catch(() => {});
+
+          const result = physicalInfos.length === 1 ? physicalInfos[0] : physicalInfos;
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
           };
