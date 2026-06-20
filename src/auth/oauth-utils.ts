@@ -61,6 +61,7 @@ export function getUpstreamAuthorizeUrl(env: Env, callbackUrl: string, state: st
   url.searchParams.set("client_id", env.POLAR_CLIENT_ID);
   url.searchParams.set("redirect_uri", callbackUrl);
   url.searchParams.set("state", state);
+  url.searchParams.set("scope", "accesslink.read_all");
   return url.toString();
 }
 

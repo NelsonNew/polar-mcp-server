@@ -24,6 +24,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
   });
 
   async init() {
+    if (!this.props) throw new Error("Missing authentication context: props were not provided to the MCP agent.");
     const accessToken = this.props.accessToken;
     const userId = this.props.userId;
 
@@ -34,6 +35,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       {},
       async () => {
         try {
+          if (!userId) throw new Error("User ID is required for get_user_info but was not provided by the authorization flow.");
           const result = await polarApiRequest(`/users/${userId}`, accessToken);
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
@@ -183,6 +185,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       {},
       async () => {
         try {
+          if (!userId) throw new Error("User ID is required for get_physical_info but was not provided by the authorization flow.");
           // 1. Create transaction
           const txResponse = await polarApiRequest(
             `/users/${userId}/physical-information-transactions`,

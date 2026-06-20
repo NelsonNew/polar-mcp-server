@@ -54,7 +54,7 @@ export async function exchangeCodeForToken(
   clientSecret: string,
   redirectUri: string
 ): Promise<PolarTokenResponse> {
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const credentials = btoa(`${clientId}:${clientSecret}`);
 
   const response = await fetch(POLAR_TOKEN_URL, {
     method: "POST",

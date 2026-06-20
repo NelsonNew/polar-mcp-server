@@ -10,6 +10,6 @@
     "types": ["@cloudflare/workers-types"],
     "lib": ["ES2022"]
   },
-  "include": ["src/worker.ts", "src/polar-api.ts"],
+  "include": ["src/worker.ts", "src/polar-api.ts", "src/auth/**/*", "src/types.ts"],
   "exclude": ["node_modules"]
 }

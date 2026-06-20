@@ -78,7 +78,7 @@ async function registerUser(accessToken: string, userId: number): Promise<void> 
       Accept: "application/json",
     },
     body: JSON.stringify({
-      "member-id": `user_${userId}`,
+      "member-id": `mcp_user_${userId}`,
     }),
   });
 
@@ -148,6 +148,7 @@ async function main() {
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+  authUrl.searchParams.set("scope", "accesslink.read_all");
 
   console.log("Step 1: Open this URL in your browser to authorize:");
   console.log("");
