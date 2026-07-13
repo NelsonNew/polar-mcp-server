@@ -123,7 +123,7 @@ All tools use the [Polar AccessLink API v3](https://www.polar.com/accesslink-api
 | Tool | Endpoint | Description |
 |------|----------|-------------|
 | `get_user_info` | `/users/{id}` | User profile |
-| `get_physical_info` | `/users/physical-information` | VO2max, max HR, resting HR |
+| `get_physical_info` | `/users/{id}/physical-information-transactions` | VO2max, max HR, resting HR (transaction flow) |
 | `get_exercises` | `/exercises` | Last 30 days of workouts |
 | `get_exercise` | `/exercises/{id}` | Single workout details |
 | `get_exercise_fit/tcx/gpx` | `/exercises/{id}/fit\|tcx\|gpx` | Export formats |

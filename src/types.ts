@@ -3,6 +3,7 @@ import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 export interface Props {
   accessToken: string;
   userId: number;
+  [key: string]: unknown;
 }
 
 export interface Env {

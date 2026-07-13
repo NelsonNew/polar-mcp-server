@@ -24,6 +24,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
   });
 
   async init() {
+    if (!this.props) throw new Error("Missing OAuth props. Please re-authenticate.");
     const accessToken = this.props.accessToken;
     const userId = this.props.userId;
 
@@ -34,6 +35,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       {},
       async () => {
         try {
+          if (!userId) throw new Error("User ID is missing from the OAuth session. Please re-authenticate.");
           const result = await polarApiRequest(`/users/${userId}`, accessToken);
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
@@ -183,6 +185,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
       {},
       async () => {
         try {
+          if (!userId) throw new Error("User ID is missing from the OAuth session. Please re-authenticate.");
           // 1. Create transaction
           const txResponse = await polarApiRequest(
             `/users/${userId}/physical-information-transactions`,
