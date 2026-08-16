@@ -24,8 +24,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
   });
 
   async init() {
-    const accessToken = this.props.accessToken;
-    const userId = this.props.userId;
+    if (!this.props) {
+      throw new Error("Props not set - OAuth flow did not complete correctly");
+    }
+    const { accessToken, userId } = this.props;
 
     // Tool: Get User Info
     this.server.tool(
