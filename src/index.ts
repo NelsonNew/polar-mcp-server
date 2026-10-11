@@ -2,6 +2,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { z } from "zod";
 
 const POLAR_API_BASE = "https://www.polaraccesslink.com/v3";
@@ -61,6 +64,66 @@ async function polarApiRequest(
   return JSON.parse(text);
 }
 
+// Helper for file downloads (FIT/TCX/GPX). These endpoints need a matching
+// Accept header (Polar answers 406 to application/json) and return XML or
+// binary, so the body is kept as raw bytes instead of being parsed as JSON.
+async function polarApiDownload(endpoint: string, accept: string): Promise<Buffer> {
+  const accessToken = getAccessToken();
+
+  const response = await fetch(`${POLAR_API_BASE}${endpoint}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: accept,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Polar API error (${response.status}): ${errorText || response.statusText}`
+    );
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
+// Exercise files are too large to return inline, so they are saved to disk:
+// saveTo (directory or full file path), else POLAR_DOWNLOAD_DIR, else ~/Downloads/polar
+async function downloadExerciseFile(
+  exerciseId: string,
+  format: "fit" | "tcx" | "gpx",
+  accept: string,
+  saveTo?: string,
+  query = ""
+) {
+  const data = await polarApiDownload(
+    `/exercises/${encodeURIComponent(exerciseId)}/${format}${query}`,
+    accept
+  );
+
+  const fileName = `${exerciseId.replace(/[^A-Za-z0-9_-]/g, "_")}.${format}`;
+  const target = saveTo
+    ? path.extname(saveTo) ? saveTo : path.join(saveTo, fileName)
+    : path.join(process.env.POLAR_DOWNLOAD_DIR || path.join(os.homedir(), "Downloads", "polar"), fileName);
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, data);
+
+  const summary: Record<string, unknown> = { format, file: target, bytes: data.length };
+  if (format === "gpx") summary.trackpoints = data.toString("utf8").match(/<trkpt\b/g)?.length ?? 0;
+  if (format === "tcx") summary.trackpoints = data.toString("utf8").match(/<Trackpoint\b/g)?.length ?? 0;
+
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }],
+  };
+}
+
+const saveToSchema = z
+  .string()
+  .optional()
+  .describe(
+    "Directory or full file path to save the file to. Optional; defaults to POLAR_DOWNLOAD_DIR or ~/Downloads/polar."
+  );
+
 // Create MCP server
 const server = new McpServer({
   name: "polar-accesslink",
@@ -101,7 +164,7 @@ server.tool(
 // Tool: Get Exercises
 server.tool(
   "get_exercises",
-  "Get exercise data from Polar. Returns exercises from the last 30 days. Can include detailed samples (heart rate, speed, distance, etc.) and training zones for deeper analysis.",
+  "Get exercise data from Polar. Returns exercises from the last 30 days. Can include detailed samples (heart rate, speed, distance, etc.), training zones and the GPS route for deeper analysis.",
   {
     samples: z
       .boolean()
@@ -115,12 +178,17 @@ server.tool(
       .describe(
         "Include heart rate zone information showing time spent in each training zone."
       ),
+    route: z
+      .boolean()
+      .optional()
+      .describe("Include GPS route points (latitude, longitude, altitude, time)."),
   },
-  async ({ samples, zones }) => {
+  async ({ samples, zones, route }) => {
     try {
       const params = new URLSearchParams();
       if (samples) params.append("samples", "true");
       if (zones) params.append("zones", "true");
+      if (route) params.append("route", "true");
 
       const queryString = params.toString();
       const endpoint = `/exercises${queryString ? `?${queryString}` : ""}`;
@@ -151,7 +219,7 @@ server.tool(
 // Tool: Get Single Exercise
 server.tool(
   "get_exercise",
-  "Get detailed data for a specific exercise by ID. Can include samples and zones for detailed analysis.",
+  "Get detailed data for a specific exercise by ID. Can include samples, zones and the GPS route for detailed analysis.",
   {
     exerciseId: z.string().describe("The exercise ID to retrieve"),
     samples: z
@@ -162,12 +230,17 @@ server.tool(
       .boolean()
       .optional()
       .describe("Include heart rate zone information"),
+    route: z
+      .boolean()
+      .optional()
+      .describe("Include GPS route points (latitude, longitude, altitude, time)"),
   },
-  async ({ exerciseId, samples, zones }) => {
+  async ({ exerciseId, samples, zones, route }) => {
     try {
       const params = new URLSearchParams();
       if (samples) params.append("samples", "true");
       if (zones) params.append("zones", "true");
+      if (route) params.append("route", "true");
 
       const queryString = params.toString();
       const endpoint = `/exercises/${exerciseId}${queryString ? `?${queryString}` : ""}`;
@@ -734,16 +807,14 @@ server.tool(
 // Tool: Get Exercise FIT
 server.tool(
   "get_exercise_fit",
-  "Download exercise data in FIT format. FIT (Flexible and Interoperable Data Transfer) is a standard format used by fitness devices and apps.",
+  "Download exercise data in FIT format. FIT (Flexible and Interoperable Data Transfer) is a standard format used by fitness devices and apps. Saves the file to disk and returns its path.",
   {
     exerciseId: z.string().describe("The exercise ID to download. Required."),
+    saveTo: saveToSchema,
   },
-  async ({ exerciseId }) => {
+  async ({ exerciseId, saveTo }) => {
     try {
-      const result = await polarApiRequest(`/exercises/${exerciseId}/fit`);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      return await downloadExerciseFile(exerciseId, "fit", "*/*", saveTo);
     } catch (error) {
       return {
         content: [{ type: "text" as const, text: `Error fetching exercise FIT: ${error instanceof Error ? error.message : String(error)}` }],
@@ -756,16 +827,14 @@ server.tool(
 // Tool: Get Exercise TCX
 server.tool(
   "get_exercise_tcx",
-  "Download exercise data in TCX format. TCX (Training Center XML) is compatible with many fitness platforms like Garmin Connect and Strava.",
+  "Download exercise data in TCX format. TCX (Training Center XML) is compatible with many fitness platforms like Garmin Connect and Strava. Saves the file to disk and returns its path.",
   {
     exerciseId: z.string().describe("The exercise ID to download. Required."),
+    saveTo: saveToSchema,
   },
-  async ({ exerciseId }) => {
+  async ({ exerciseId, saveTo }) => {
     try {
-      const result = await polarApiRequest(`/exercises/${exerciseId}/tcx`);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      return await downloadExerciseFile(exerciseId, "tcx", "application/vnd.garmin.tcx+xml", saveTo);
     } catch (error) {
       return {
         content: [{ type: "text" as const, text: `Error fetching exercise TCX: ${error instanceof Error ? error.message : String(error)}` }],
@@ -778,16 +847,19 @@ server.tool(
 // Tool: Get Exercise GPX
 server.tool(
   "get_exercise_gpx",
-  "Download exercise GPS route in GPX format. GPX (GPS Exchange Format) contains the route/track data and can be used with mapping applications.",
+  "Download exercise GPS route in GPX format. GPX (GPS Exchange Format) contains the route/track data and can be used with mapping applications. Saves the file to disk and returns its path.",
   {
     exerciseId: z.string().describe("The exercise ID to download. Required."),
+    includePauseTimes: z
+      .boolean()
+      .optional()
+      .describe("Include pause times in the GPX track. Optional."),
+    saveTo: saveToSchema,
   },
-  async ({ exerciseId }) => {
+  async ({ exerciseId, includePauseTimes, saveTo }) => {
     try {
-      const result = await polarApiRequest(`/exercises/${exerciseId}/gpx`);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      const query = includePauseTimes ? "?includePauseTimes=true" : "";
+      return await downloadExerciseFile(exerciseId, "gpx", "application/gpx+xml", saveTo, query);
     } catch (error) {
       return {
         content: [{ type: "text" as const, text: `Error fetching exercise GPX: ${error instanceof Error ? error.message : String(error)}` }],
