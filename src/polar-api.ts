@@ -46,6 +46,85 @@ export async function polarApiRequest(
 }
 
 /**
+ * Download an exercise file (FIT/TCX/GPX). These endpoints need a matching
+ * Accept header (Polar answers 406 to application/json) and return XML or
+ * binary, so the body is kept as raw bytes instead of being parsed as JSON.
+ */
+export async function polarApiDownload(
+  endpoint: string,
+  accessToken: string,
+  accept: string
+): Promise<Uint8Array> {
+  const response = await fetch(`${POLAR_API_BASE}${endpoint}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: accept,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Polar API error (${response.status}): ${errorText || response.statusText}`
+    );
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+const EXERCISE_FILE_TYPES = {
+  fit: { accept: "*/*", mimeType: "application/vnd.ant.fit" },
+  tcx: { accept: "application/vnd.garmin.tcx+xml", mimeType: "application/vnd.garmin.tcx+xml" },
+  gpx: { accept: "application/gpx+xml", mimeType: "application/gpx+xml" },
+} as const;
+
+export type ToolContent = Array<
+  | { type: "text"; text: string }
+  | {
+      type: "resource";
+      resource:
+        | { uri: string; mimeType: string; text: string }
+        | { uri: string; mimeType: string; blob: string };
+    }
+>;
+
+/**
+ * Fetch an exercise file and return it as MCP content: a short JSON summary
+ * plus the file as an embedded resource (text for TCX/GPX, base64 blob for FIT).
+ * Works without a filesystem, so it is usable from the Cloudflare Worker.
+ */
+export async function getExerciseFileContent(
+  exerciseId: string,
+  format: keyof typeof EXERCISE_FILE_TYPES,
+  accessToken: string,
+  query = ""
+): Promise<ToolContent> {
+  const { accept, mimeType } = EXERCISE_FILE_TYPES[format];
+  const id = encodeURIComponent(exerciseId);
+  const data = await polarApiDownload(`/exercises/${id}/${format}${query}`, accessToken, accept);
+  const uri = `polar://exercises/${id}.${format}`;
+  const summary: Record<string, unknown> = { format, bytes: data.length };
+
+  if (format === "fit") {
+    let binary = "";
+    for (let i = 0; i < data.length; i += 0x8000) {
+      binary += String.fromCharCode(...data.subarray(i, i + 0x8000));
+    }
+    return [
+      { type: "text", text: JSON.stringify(summary, null, 2) },
+      { type: "resource", resource: { uri, mimeType, blob: btoa(binary) } },
+    ];
+  }
+
+  const text = new TextDecoder().decode(data);
+  summary.trackpoints = text.match(format === "gpx" ? /<trkpt\b/g : /<Trackpoint\b/g)?.length ?? 0;
+  return [
+    { type: "text", text: JSON.stringify(summary, null, 2) },
+    { type: "resource", resource: { uri, mimeType, text } },
+  ];
+}
+
+/**
  * Exchange OAuth code for access token
  */
 export async function exchangeCodeForToken(
@@ -132,6 +211,10 @@ export const POLAR_TOOLS = {
           description:
             "Include heart rate zone information showing time spent in each training zone.",
         },
+        route: {
+          type: "boolean",
+          description: "Include GPS route points (latitude, longitude, altitude, time).",
+        },
       },
       required: [],
     },
@@ -154,6 +237,10 @@ export const POLAR_TOOLS = {
         zones: {
           type: "boolean",
           description: "Include heart rate zone information",
+        },
+        route: {
+          type: "boolean",
+          description: "Include GPS route points (latitude, longitude, altitude, time)",
         },
       },
       required: ["exerciseId"],
@@ -480,6 +567,10 @@ export const POLAR_TOOLS = {
           type: "string",
           description: "The exercise ID to download. Required.",
         },
+        includePauseTimes: {
+          type: "boolean",
+          description: "Include pause times in the GPX track. Optional.",
+        },
       },
       required: ["exerciseId"],
     },
@@ -551,7 +642,7 @@ export async function executePolarTool(
   args: Record<string, unknown>,
   accessToken: string,
   userId?: string | number
-): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
+): Promise<{ content: ToolContent; isError?: boolean }> {
   try {
     let result: unknown;
 
@@ -565,6 +656,7 @@ export async function executePolarTool(
         const params = new URLSearchParams();
         if (args.samples) params.append("samples", "true");
         if (args.zones) params.append("zones", "true");
+        if (args.route) params.append("route", "true");
         const queryString = params.toString();
         const endpoint = `/exercises${queryString ? `?${queryString}` : ""}`;
         result = await polarApiRequest(endpoint, accessToken);
@@ -575,6 +667,7 @@ export async function executePolarTool(
         const params = new URLSearchParams();
         if (args.samples) params.append("samples", "true");
         if (args.zones) params.append("zones", "true");
+        if (args.route) params.append("route", "true");
         const queryString = params.toString();
         const endpoint = `/exercises/${args.exerciseId}${queryString ? `?${queryString}` : ""}`;
         result = await polarApiRequest(endpoint, accessToken);
@@ -779,23 +872,21 @@ export async function executePolarTool(
         break;
       }
 
-      case "get_exercise_fit": {
-        const endpoint = `/exercises/${args.exerciseId}/fit`;
-        result = await polarApiRequest(endpoint, accessToken);
-        break;
-      }
+      case "get_exercise_fit":
+        return { content: await getExerciseFileContent(args.exerciseId as string, "fit", accessToken) };
 
-      case "get_exercise_tcx": {
-        const endpoint = `/exercises/${args.exerciseId}/tcx`;
-        result = await polarApiRequest(endpoint, accessToken);
-        break;
-      }
+      case "get_exercise_tcx":
+        return { content: await getExerciseFileContent(args.exerciseId as string, "tcx", accessToken) };
 
-      case "get_exercise_gpx": {
-        const endpoint = `/exercises/${args.exerciseId}/gpx`;
-        result = await polarApiRequest(endpoint, accessToken);
-        break;
-      }
+      case "get_exercise_gpx":
+        return {
+          content: await getExerciseFileContent(
+            args.exerciseId as string,
+            "gpx",
+            accessToken,
+            args.includePauseTimes ? "?includePauseTimes=true" : ""
+          ),
+        };
 
       case "get_daily_activity_range": {
         const params = new URLSearchParams();
