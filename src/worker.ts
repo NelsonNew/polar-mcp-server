@@ -11,7 +11,7 @@ import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { polarApiRequest } from "./polar-api.js";
+import { getExerciseFileContent, polarApiRequest } from "./polar-api.js";
 import { PolarHandler } from "./auth/polar-handler.js";
 import type { Env, Props } from "./types.js";
 
@@ -50,16 +50,18 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
     // Tool: Get Exercises
     this.server.tool(
       "get_exercises",
-      "Get exercise data from Polar. Returns exercises from the last 30 days. Can include detailed samples and training zones.",
+      "Get exercise data from Polar. Returns exercises from the last 30 days. Can include detailed samples, training zones and the GPS route.",
       {
         samples: z.boolean().optional().describe("Include detailed sample data (heart rate, speed, etc.)"),
         zones: z.boolean().optional().describe("Include heart rate zone information"),
+        route: z.boolean().optional().describe("Include GPS route points (latitude, longitude, altitude, time)"),
       },
-      async ({ samples, zones }) => {
+      async ({ samples, zones, route }) => {
         try {
           const params = new URLSearchParams();
           if (samples) params.append("samples", "true");
           if (zones) params.append("zones", "true");
+          if (route) params.append("route", "true");
           const queryString = params.toString();
           const endpoint = `/exercises${queryString ? `?${queryString}` : ""}`;
           const result = await polarApiRequest(endpoint, accessToken);
@@ -78,17 +80,19 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
     // Tool: Get Single Exercise
     this.server.tool(
       "get_exercise",
-      "Get detailed data for a specific exercise by ID.",
+      "Get detailed data for a specific exercise by ID. Can include samples, zones and the GPS route.",
       {
         exerciseId: z.string().describe("The exercise ID to retrieve"),
         samples: z.boolean().optional().describe("Include detailed sample data"),
         zones: z.boolean().optional().describe("Include heart rate zone information"),
+        route: z.boolean().optional().describe("Include GPS route points (latitude, longitude, altitude, time)"),
       },
-      async ({ exerciseId, samples, zones }) => {
+      async ({ exerciseId, samples, zones, route }) => {
         try {
           const params = new URLSearchParams();
           if (samples) params.append("samples", "true");
           if (zones) params.append("zones", "true");
+          if (route) params.append("route", "true");
           const queryString = params.toString();
           const endpoint = `/exercises/${exerciseId}${queryString ? `?${queryString}` : ""}`;
           const result = await polarApiRequest(endpoint, accessToken);
@@ -559,16 +563,13 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
     // Tool: Get Exercise FIT
     this.server.tool(
       "get_exercise_fit",
-      "Download exercise in FIT format.",
+      "Download exercise in FIT format. Returned as an embedded resource (base64 blob).",
       {
         exerciseId: z.string().describe("Exercise ID. Required."),
       },
       async ({ exerciseId }) => {
         try {
-          const result = await polarApiRequest(`/exercises/${exerciseId}/fit`, accessToken);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          };
+          return { content: await getExerciseFileContent(exerciseId, "fit", accessToken) };
         } catch (error) {
           return {
             content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
@@ -581,16 +582,13 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
     // Tool: Get Exercise TCX
     this.server.tool(
       "get_exercise_tcx",
-      "Download exercise in TCX format.",
+      "Download exercise in TCX format. Returned as an embedded resource.",
       {
         exerciseId: z.string().describe("Exercise ID. Required."),
       },
       async ({ exerciseId }) => {
         try {
-          const result = await polarApiRequest(`/exercises/${exerciseId}/tcx`, accessToken);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          };
+          return { content: await getExerciseFileContent(exerciseId, "tcx", accessToken) };
         } catch (error) {
           return {
             content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
@@ -603,16 +601,15 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
     // Tool: Get Exercise GPX
     this.server.tool(
       "get_exercise_gpx",
-      "Download exercise GPS route in GPX format.",
+      "Download exercise GPS route in GPX format. Returned as an embedded resource.",
       {
         exerciseId: z.string().describe("Exercise ID. Required."),
+        includePauseTimes: z.boolean().optional().describe("Include pause times in the GPX track. Optional."),
       },
-      async ({ exerciseId }) => {
+      async ({ exerciseId, includePauseTimes }) => {
         try {
-          const result = await polarApiRequest(`/exercises/${exerciseId}/gpx`, accessToken);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          };
+          const query = includePauseTimes ? "?includePauseTimes=true" : "";
+          return { content: await getExerciseFileContent(exerciseId, "gpx", accessToken, query) };
         } catch (error) {
           return {
             content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
